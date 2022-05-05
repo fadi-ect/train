@@ -1,0 +1,72 @@
+name: Build and Publish
+
+on:
+  # run it on push to the default repository branch
+  push:
+    branches: [main, cicd]
+  # run it during pull request
+  pull_request:
+
+jobs:
+  # define job to build and publish docker image
+  build-and-push-docker-image:
+    name: Build Docker image and push to repositories
+    # run only when code is compiling and tests are passing
+    runs-on: ubuntu-latest
+
+    # steps to perform in job
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      # setup Docker build action
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v1
+        with:
+          username: fadix95
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      
+      - name: Set outputs
+        id: vars
+        run: echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
+        
+      - name: Check outputs
+        run: echo ${{ steps.vars.outputs.sha_short }}
+      
+      - name: Install python version
+      # use the pyenv-action version 7
+        uses: gabrielfalcao/pyenv-action@v7
+        with:
+          default: 3.9.7 # pick 3.8.6 verion 
+          command: pip install -U pip  # upgrade pip after installing python
+      
+      - name: create environment
+        run: pyenv local 3.9.7 && python -mvenv .venv397
+
+      - name: Install dependencies
+        run: pip install scikit-learn
+
+
+      - name: setup pyenv
+        id: pyenv_installation
+        uses: "gabrielfalcao/pyenv-action@v7"
+
+      - name: debug pyenv
+        run: echo ${{ steps.pyenv_installation.outputs.pyenv_root }}
+      
+      - name: Build image and push to Docker Hub and GitHub Container Registry
+        uses: docker/build-push-action@v2
+        with:
+          # relative path to the place where source code with Dockerfile is located
+          context: .
+          # Note: tags has to be all lower-case
+          tags: fadix95/hetic-data:${{ steps.vars.outputs.sha_short }}
+          # build on feature branches, push only on main branch
+          push: true # ${{ github.ref == 'refs/heads/main' }}
+
+      - name: Image digest
+        run: echo ${{ steps.docker_build.outputs.digest }}

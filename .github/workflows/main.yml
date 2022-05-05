@@ -65,7 +65,7 @@ jobs:
         run: |
           ls -l .
           python train.py
-          echo "Trained model ${{ steps.vars.outputs.sha_short }} with data 0cfc9d2"
+          echo "Trained model ${{ steps.vars.outputs.sha_short }} with data 6a95fb0"
           ls -l .
 
       ########### DOCKER ##################

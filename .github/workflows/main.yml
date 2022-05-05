@@ -41,11 +41,11 @@ jobs:
       # use the pyenv-action version 7
         uses: gabrielfalcao/pyenv-action@v7
         with:
-          default: 3.9.7 # pick 3.8.6 verion 
+          default: 3.8.6 # pick 3.8.6 verion 
           command: pip install -U pip  # upgrade pip after installing python
       
       - name: create environment
-        run: pyenv local 3.9.7 && python -mvenv .venv397
+        run: pyenv local 3.8.6 && python -mvenv .venv386
 
       - name: Install dependencies
         run: pip install scikit-learn

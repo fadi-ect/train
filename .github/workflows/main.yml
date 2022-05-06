@@ -5,7 +5,7 @@ on:
   push:
     branches: [main, cicd]
   # run it during pull request
-  pull_request:
+  repository_dispatch:
 
 jobs:
   # define job to build and publish docker image
@@ -29,11 +29,11 @@ jobs:
         with:
           username: fadix95
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      
+
       - name: Set outputs
         id: vars
         run: echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
-        
+
       - name: Check outputs
         run: echo ${{ steps.vars.outputs.sha_short }}
 
@@ -43,10 +43,11 @@ jobs:
       - run: |
           set -x
           docker version
-          container_id=$(docker create fadix95/hetic-data:6a95fb0)
+          export dataset_commit_id=${{ github.event.client_payload.dataset_commit_id || 'latest' }}
+          container_id=$(docker create fadix95/hetic-data:$dataset_commit_id)
           docker cp "$container_id:/data/input.data.json" .
           docker cp "$container_id:/data/output.data.json" .
-          echo "Extracting dataset version 6a95fb0"
+          echo "Extracting dataset version $dataset_commit_id"
           pwd
           ls -l .
 
@@ -55,21 +56,21 @@ jobs:
         uses: actions/setup-python@v2
         with:
           python-version: 3.8
-      
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install scikit-learn
-      
+
       - name: execute py script # run file
         run: |
           ls -l .
           python train.py
-          echo "Trained model ${{ steps.vars.outputs.sha_short }} with data 6a95fb0"
+          echo "Trained model ${{ steps.vars.outputs.sha_short }} with data $dataset_commit_id"
           ls -l .
 
       ########### DOCKER ##################
-      
+
       - name: Build image and push to Docker Hub and GitHub Container Registry
         uses: docker/build-push-action@v2
         with:
@@ -77,9 +78,16 @@ jobs:
           context: .
           file: Model.dockerfile
           # Note: tags has to be all lower-case
-          tags: fadix95/hetic-model:${{ steps.vars.outputs.sha_short }}
+          tags: fadix95/hetic-model:latest,fadix95/hetic-model:${{ steps.vars.outputs.sha_short }}
           # build on feature branches, push only on main branch
           push: true # ${{ github.ref == 'refs/heads/main' }}
 
       - name: Image digest
         run: echo ${{ steps.docker_build.outputs.digest }}
+
+      - name: Trigger API
+        run: |
+          curl -H "Authorization: token ${{ secrets.WF_TOKEN }}" \
+          -H 'Accept: application/vnd.github.everest-preview+json' \
+          "https://api.github.com/repos/fadix95/hetic-api/dispatches" \
+          -d '{"event_type": "new_model_${{ steps.vars.outputs.sha_short }}", "client_payload": {"model_commit_id": "${{ steps.vars.outputs.sha_short }}"}}'
